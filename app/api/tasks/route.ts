@@ -28,9 +28,34 @@ async function GET() {
   }
 }
 
-async function POST() {
+async function POST({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   try {
-  } catch (error) {}
+    const sessionCookie = (await cookies()).get("session")?.value;
+    if (!sessionCookie) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
+    const { uid } = decodedToken;
+
+    await dbConnect();
+
+    const task = await Task.create({ userId: uid, title, description });
+
+    return NextResponse.json({ task });
+  } catch (error) {
+    console.error("Error creating task:", error);
+    return NextResponse.json(
+      { error: "Failed to create task" },
+      { status: 500 },
+    );
+  }
 }
 
 async function PATCH() {
