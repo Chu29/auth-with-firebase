@@ -58,9 +58,32 @@ async function POST({
   }
 }
 
-async function PATCH() {
+async function PATCH(data: { data: object }) {
   try {
-  } catch (error) {}
+    const sessionCookie = (await cookies()).get("session")?.value;
+    if (!sessionCookie) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
+    const { uid } = decodedToken;
+
+    await dbConnect();
+
+    const task = await Task.findByIdAndUpdate(
+      data.id,
+      { ...data, userId: uid },
+      { new: true },
+    );
+
+    return NextResponse.json({ task });
+  } catch (error) {
+    console.error("Error updating task:", error);
+    return NextResponse.json(
+      { error: "Failed to update task" },
+      { status: 500 },
+    );
+  }
 }
 
 async function DELETE() {
