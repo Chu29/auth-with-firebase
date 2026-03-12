@@ -28,6 +28,10 @@ export function useAuth() {
         body: JSON.stringify({ idToken }),
       });
 
+      await fetch("/api/users", {
+        method: "POST",
+      });
+
       router.push("/dashboard");
       router.refresh();
     } catch (error: unknown) {
