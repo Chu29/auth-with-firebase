@@ -60,13 +60,16 @@ export default async function DashboardPage() {
                 Authenticated
               </p>
               <p className="mt-2 text-sm text-text-secondary">
+                Profile name{" "}
+                <span className="font-medium text-text-primary">
+                  {session.name}
+                </span>
+              </p>
+              <p className="mt-2 text-sm text-text-secondary">
                 Signed in as{" "}
                 <span className="font-medium text-text-primary">
                   {session.email}
                 </span>
-              </p>
-              <p className="mt-1 truncate text-xs font-mono text-text-muted">
-                UID: {session.uid}
               </p>
             </div>
           </div>

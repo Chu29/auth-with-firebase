@@ -5,7 +5,7 @@ import "./global.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "My Auth App",
+  title: "Tasky",
   description: "Firebase Authentication with Next.js",
 };
 
