@@ -1,8 +1,8 @@
 import { adminAuth } from "@/lib/firebase-admin";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import dbConnect from "../config/mongodb";
-import User from "../models/userSchema";
+import dbConnect from "@/lib/config/mongodb";
+import User from "@/lib/models/userSchema";
 
 export async function POST() {
   try {
