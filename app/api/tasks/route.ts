@@ -58,7 +58,7 @@ async function POST({
   }
 }
 
-async function PATCH(data: { data: object }) {
+async function PATCH(data: { id: object }) {
   try {
     const sessionCookie = (await cookies()).get("session")?.value;
     if (!sessionCookie) {
@@ -86,7 +86,26 @@ async function PATCH(data: { data: object }) {
   }
 }
 
-async function DELETE() {
+async function DELETE(data: { id: string }) {
   try {
-  } catch (error) {}
+    const sessionCookie = (await cookies()).get("session")?.value;
+    if (!sessionCookie) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
+    const { uid } = decodedToken;
+
+    await dbConnect();
+
+    const task = await Task.findByIdAndDelete(data.id);
+
+    return NextResponse.json({ task });
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    return NextResponse.json(
+      { error: "Failed to delete task" },
+      { status: 500 },
+    );
+  }
 }
