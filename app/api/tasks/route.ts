@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/config/mongodb";
 import Task from "@/lib/models/taskSchema";
 
-async function GET() {
+export async function GET() {
   try {
     const sessionCookie = (await cookies()).get("session")?.value;
     if (!sessionCookie) {
@@ -28,13 +28,7 @@ async function GET() {
   }
 }
 
-async function POST({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
+export async function POST(req: Request) {
   try {
     const sessionCookie = (await cookies()).get("session")?.value;
     if (!sessionCookie) {
@@ -44,11 +38,22 @@ async function POST({
     const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
     const { uid } = decodedToken;
 
+    const { title, description, dueDate } = await req.json();
+
+    if (!title) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
+    }
+
     await dbConnect();
 
-    const task = await Task.create({ userId: uid, title, description });
+    const task = await Task.create({
+      userId: uid,
+      title,
+      description,
+      dueDate,
+    });
 
-    return NextResponse.json({ task });
+    return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
     console.error("Error creating task:", error);
     return NextResponse.json(
@@ -58,7 +63,7 @@ async function POST({
   }
 }
 
-async function PATCH(data: { id: object }) {
+export async function PATCH(req: Request) {
   try {
     const sessionCookie = (await cookies()).get("session")?.value;
     if (!sessionCookie) {
@@ -68,13 +73,26 @@ async function PATCH(data: { id: object }) {
     const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
     const { uid } = decodedToken;
 
+    const { id, title, description, status, dueDate } = await req.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Task ID is required" },
+        { status: 400 },
+      );
+    }
+
     await dbConnect();
 
-    const task = await Task.findByIdAndUpdate(
-      data.id,
-      { ...data, userId: uid },
+    const task = await Task.findOneAndUpdate(
+      { _id: id, userId: uid },
+      { title, description, status, dueDate },
       { new: true },
     );
+
+    if (!task) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ task });
   } catch (error) {
@@ -86,7 +104,7 @@ async function PATCH(data: { id: object }) {
   }
 }
 
-async function DELETE(data: { id: string }) {
+export async function DELETE(req: Request) {
   try {
     const sessionCookie = (await cookies()).get("session")?.value;
     if (!sessionCookie) {
@@ -96,9 +114,22 @@ async function DELETE(data: { id: string }) {
     const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
     const { uid } = decodedToken;
 
+    const { id } = await req.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Task ID is required" },
+        { status: 400 },
+      );
+    }
+
     await dbConnect();
 
-    const task = await Task.findByIdAndDelete(data.id);
+    const task = await Task.findOneAndDelete({ _id: id, userId: uid });
+
+    if (!task) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ task });
   } catch (error) {
