@@ -24,7 +24,7 @@ export async function POST() {
         displayName: name || email,
         photoURL: picture || "",
       },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: "after" },
     );
 
     return NextResponse.json({ user });
