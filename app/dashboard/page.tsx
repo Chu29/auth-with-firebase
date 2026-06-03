@@ -2,6 +2,7 @@ import { adminAuth } from "@/lib/firebase-admin";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import SignOutButton from "@/components/signOutButton";
+import TasksPanel from "@/components/tasksPanel";
 
 async function getSession() {
   const sessionCookie = (await cookies()).get("session")?.value;
@@ -74,6 +75,8 @@ export default async function DashboardPage() {
             </div>
           </div>
         </div>
+
+        <TasksPanel />
       </div>
     </main>
   );
