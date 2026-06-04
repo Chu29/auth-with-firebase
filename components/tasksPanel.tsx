@@ -9,6 +9,8 @@ import {
 } from "react";
 
 type TaskStatus = "completed" | "uncompleted";
+type StatusFilter = "all" | "completed" | "uncompleted";
+type DueFilter = "all" | "today" | "overdue" | "week" | "none";
 
 type Task = {
   _id: string;
@@ -25,11 +27,40 @@ type TaskFormState = {
   dueDate: string;
 };
 
+type ViewFilters = {
+  query: string;
+  status: StatusFilter;
+  due: DueFilter;
+};
+
+type SavedView = {
+  id: string;
+  name: string;
+  filters: ViewFilters;
+};
+
+type FilterTab = {
+  id: string;
+  label: string;
+  status: StatusFilter;
+  due: DueFilter;
+};
+
 const emptyForm: TaskFormState = {
   title: "",
   description: "",
   dueDate: "",
 };
+
+const FILTER_TABS: FilterTab[] = [
+  { id: "all", label: "All", status: "all", due: "all" },
+  { id: "in-progress", label: "In progress", status: "uncompleted", due: "all" },
+  { id: "completed", label: "Completed", status: "completed", due: "all" },
+  { id: "today", label: "Due today", status: "all", due: "today" },
+  { id: "week", label: "Next 7 days", status: "all", due: "week" },
+  { id: "overdue", label: "Overdue", status: "all", due: "overdue" },
+  { id: "no-due", label: "No due date", status: "all", due: "none" },
+];
 
 async function readErrorMessage(response: Response) {
   try {
@@ -61,6 +92,12 @@ function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 function formatDelta(delta: number, label: string) {
   const sign = delta > 0 ? "+" : "";
   return `${sign}${delta} ${label}`;
@@ -73,6 +110,20 @@ export default function TasksPanel() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TaskFormState>(emptyForm);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [dueFilter, setDueFilter] = useState<DueFilter>("all");
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [viewName, setViewName] = useState("");
+  const [viewError, setViewError] = useState<string | null>(null);
+
+  const activeTabId = useMemo(() => {
+    const match = FILTER_TABS.find(
+      (tab) => tab.status === statusFilter && tab.due === dueFilter,
+    );
+    return match?.id ?? null;
+  }, [statusFilter, dueFilter]);
 
   const summary = useMemo(() => {
     const now = new Date();
@@ -140,6 +191,73 @@ export default function TasksPanel() {
   const overdueDelta = summary.overdue - summary.overduePrev;
   const completedDelta = summary.completedThisWeek - summary.completedPrevWeek;
 
+  const filteredTasks = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const todayStart = startOfDay(new Date());
+    const tomorrowStart = addDays(todayStart, 1);
+    const weekEnd = addDays(todayStart, 7);
+
+    return tasks.filter((task) => {
+      if (statusFilter !== "all" && task.status !== statusFilter) {
+        return false;
+      }
+
+      const dueDate = toDate(task.dueDate);
+      if (dueFilter === "today") {
+        if (!dueDate || dueDate < todayStart || dueDate >= tomorrowStart) {
+          return false;
+        }
+      }
+      if (dueFilter === "overdue") {
+        if (!dueDate || dueDate >= todayStart) {
+          return false;
+        }
+      }
+      if (dueFilter === "week") {
+        if (!dueDate || dueDate < todayStart || dueDate >= weekEnd) {
+          return false;
+        }
+      }
+      if (dueFilter === "none") {
+        if (dueDate) {
+          return false;
+        }
+      }
+
+      if (!query) return true;
+      const haystack = `${task.title} ${task.description ?? ""}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [tasks, searchQuery, statusFilter, dueFilter]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem("taskViews");
+      if (!stored) return;
+      const parsed = JSON.parse(stored) as SavedView[];
+      if (Array.isArray(parsed)) {
+        setSavedViews(parsed);
+      }
+    } catch (err) {
+      setViewError(
+        (err as Error).message ?? "Failed to load saved task views",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem("taskViews", JSON.stringify(savedViews));
+      setViewError(null);
+    } catch (err) {
+      setViewError(
+        (err as Error).message ?? "Failed to save task view changes",
+      );
+    }
+  }, [savedViews]);
+
   const markPending = (taskId: string) => {
     setPendingIds((prev) => new Set(prev).add(taskId));
   };
@@ -179,6 +297,57 @@ export default function TasksPanel() {
   ) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleFilterChange = (
+    key: keyof ViewFilters,
+    value: ViewFilters[keyof ViewFilters],
+  ) => {
+    setActiveViewId(null);
+    if (key === "query") setSearchQuery(value as string);
+    if (key === "status") setStatusFilter(value as StatusFilter);
+    if (key === "due") setDueFilter(value as DueFilter);
+  };
+
+  const applyTab = (tab: FilterTab) => {
+    setActiveViewId(null);
+    setStatusFilter(tab.status);
+    setDueFilter(tab.due);
+  };
+
+  const applyView = (view: SavedView) => {
+    setActiveViewId(view.id);
+    setSearchQuery(view.filters.query);
+    setStatusFilter(view.filters.status);
+    setDueFilter(view.filters.due);
+  };
+
+  const saveView = () => {
+    const trimmedName = viewName.trim();
+    if (!trimmedName) {
+      setViewError("Provide a name to save this view.");
+      return;
+    }
+    const newView: SavedView = {
+      id: `${Date.now()}`,
+      name: trimmedName,
+      filters: {
+        query: searchQuery,
+        status: statusFilter,
+        due: dueFilter,
+      },
+    };
+    setSavedViews((prev) => [newView, ...prev]);
+    setViewName("");
+    setViewError(null);
+    setActiveViewId(newView.id);
+  };
+
+  const deleteView = (id: string) => {
+    setSavedViews((prev) => prev.filter((view) => view.id !== id));
+    if (activeViewId === id) {
+      setActiveViewId(null);
+    }
   };
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
@@ -355,6 +524,11 @@ export default function TasksPanel() {
           {error}
         </div>
       )}
+      {viewError && (
+        <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {viewError}
+        </div>
+      )}
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,0.9fr),minmax(0,1.1fr)]">
         <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
@@ -442,15 +616,122 @@ export default function TasksPanel() {
           </div>
 
           <div className="mt-5">
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs uppercase tracking-wide text-text-muted">
+                  Search
+                </span>
+                <input
+                  value={searchQuery}
+                  onChange={(event) =>
+                    handleFilterChange("query", event.target.value)
+                  }
+                  placeholder="Search tasks..."
+                  className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                {FILTER_TABS.map((tab) => {
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => applyTab(tab)}
+                      aria-pressed={isActive}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition ${
+                        isActive
+                          ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-200"
+                          : "border-border-subtle text-text-secondary hover:border-indigo-500/30 hover:text-text-primary"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+                {activeTabId === null && (
+                  <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-amber-200">
+                    Custom
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="text-xs uppercase tracking-wide text-text-muted">
+                Saved views
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveViewId(null);
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                  setDueFilter("all");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition ${
+                  activeViewId === null &&
+                  searchQuery === "" &&
+                  statusFilter === "all" &&
+                  dueFilter === "all"
+                    ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-200"
+                    : "border-border-subtle text-text-secondary hover:border-indigo-500/30 hover:text-text-primary"
+                }`}
+              >
+                Default
+              </button>
+              {savedViews.map((view) => (
+                <span
+                  key={view.id}
+                  className="flex items-center gap-1 rounded-full border border-border-subtle bg-surface-overlay px-2 py-1 text-xs text-text-secondary"
+                >
+                  <button
+                    type="button"
+                    onClick={() => applyView(view)}
+                    className={`px-2 py-1 text-xs font-medium ${
+                      activeViewId === view.id
+                        ? "text-indigo-200"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    {view.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteView(view.id)}
+                    className="rounded-full px-1 text-xs text-text-muted hover:text-red-300"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <input
+                value={viewName}
+                onChange={(event) => setViewName(event.target.value)}
+                placeholder="Save this view as..."
+                className="w-full flex-1 rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
+              />
+              <button
+                type="button"
+                onClick={saveView}
+                className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-white/6"
+              >
+                Save view
+              </button>
+            </div>
+
             {loading ? (
               <p className="text-sm text-text-secondary">Loading tasks…</p>
-            ) : tasks.length === 0 ? (
+            ) : filteredTasks.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border-subtle bg-surface-overlay px-4 py-6 text-sm text-text-muted">
-                No tasks yet. Add your first task to get started.
+                No tasks match these filters.
               </div>
             ) : (
               <ul className="space-y-3">
-                {tasks.map((task) => {
+                {filteredTasks.map((task) => {
                   const due = formatDate(task.dueDate);
                   const isPending = pendingIds.has(task._id);
                   const isComplete = task.status === "completed";
