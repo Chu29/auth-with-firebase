@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/config/mongodb";
 import Task from "@/lib/models/taskSchema";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET() {
   try {
@@ -53,6 +54,11 @@ export async function POST(req: Request) {
       dueDate,
     });
 
+    await logActivity(uid, "task-created", {
+      taskTitle: task.title,
+      taskId: task._id.toString(),
+    });
+
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
     console.error("Error creating task:", error);
@@ -84,14 +90,27 @@ export async function PATCH(req: Request) {
 
     await dbConnect();
 
+    const oldTask = await Task.findOne({ _id: id, userId: uid });
+    if (!oldTask) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
     const task = await Task.findOneAndUpdate(
       { _id: id, userId: uid },
       { title, description, status, dueDate },
       { new: true },
     );
 
-    if (!task) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    if (status === "completed" && oldTask.status !== "completed") {
+      await logActivity(uid, "task-completed", {
+        taskTitle: task.title,
+        taskId: task._id.toString(),
+      });
+    } else {
+      await logActivity(uid, "task-updated", {
+        taskTitle: task.title,
+        taskId: task._id.toString(),
+      });
     }
 
     return NextResponse.json({ task });
@@ -130,6 +149,11 @@ export async function DELETE(req: Request) {
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
+
+    await logActivity(uid, "task-deleted", {
+      taskTitle: task.title,
+      taskId: task._id.toString(),
+    });
 
     return NextResponse.json({ task });
   } catch (error) {
