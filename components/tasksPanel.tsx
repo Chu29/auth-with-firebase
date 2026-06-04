@@ -4,63 +4,34 @@ import {
   useEffect,
   useMemo,
   useState,
+  useCallback,
   type ChangeEvent,
   type FormEvent,
 } from "react";
-
-type TaskStatus = "completed" | "uncompleted";
-type StatusFilter = "all" | "completed" | "uncompleted";
-type DueFilter = "all" | "today" | "overdue" | "week" | "none";
-
-type Task = {
-  _id: string;
-  title: string;
-  description?: string;
-  status: TaskStatus;
-  dueDate?: string | null;
-  updatedAt?: string | null;
-};
-
-type TaskFormState = {
-  title: string;
-  description: string;
-  dueDate: string;
-};
-
-type ViewFilters = {
-  query: string;
-  status: StatusFilter;
-  due: DueFilter;
-};
-
-type SavedView = {
-  id: string;
-  name: string;
-  filters: ViewFilters;
-};
-
-type FilterTab = {
-  id: string;
-  label: string;
-  status: StatusFilter;
-  due: DueFilter;
-};
+import { useNotifications } from "@/hooks/useNotifications";
+import { TaskSkeleton } from "./skeletons";
+import {
+  Task,
+  TaskFormState,
+  StatusFilter,
+  DueFilter,
+  SavedView,
+  FILTER_TABS,
+  toDate,
+  startOfDay,
+  addDays,
+  TaskStats,
+  TaskCreateForm,
+  TaskFilters,
+  TaskViewManager,
+  TaskListItem,
+} from "./tasks";
 
 const emptyForm: TaskFormState = {
   title: "",
   description: "",
   dueDate: "",
 };
-
-const FILTER_TABS: FilterTab[] = [
-  { id: "all", label: "All", status: "all", due: "all" },
-  { id: "in-progress", label: "In progress", status: "uncompleted", due: "all" },
-  { id: "completed", label: "Completed", status: "completed", due: "all" },
-  { id: "today", label: "Due today", status: "all", due: "today" },
-  { id: "week", label: "Next 7 days", status: "all", due: "week" },
-  { id: "overdue", label: "Overdue", status: "all", due: "overdue" },
-  { id: "no-due", label: "No due date", status: "all", due: "none" },
-];
 
 async function readErrorMessage(response: Response) {
   try {
@@ -69,45 +40,15 @@ async function readErrorMessage(response: Response) {
       return data.error;
     }
   } catch {
-    // Fall through to generic message.
+    // Fall through
   }
   return `Request failed with status ${response.status}`;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString();
-}
-
-function toDate(value?: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date;
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function formatDelta(delta: number, label: string) {
-  const sign = delta > 0 ? "+" : "";
-  return `${sign}${delta} ${label}`;
 }
 
 export default function TasksPanel() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TaskFormState>(emptyForm);
   const [searchQuery, setSearchQuery] = useState("");
@@ -117,6 +58,9 @@ export default function TasksPanel() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [viewName, setViewName] = useState("");
   const [viewError, setViewError] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<TaskFormState>(emptyForm);
+  const { notify } = useNotifications();
 
   const activeTabId = useMemo(() => {
     const match = FILTER_TABS.find(
@@ -187,10 +131,6 @@ export default function TasksPanel() {
     };
   }, [tasks]);
 
-  const dueTodayDelta = summary.dueToday - summary.dueYesterday;
-  const overdueDelta = summary.overdue - summary.overduePrev;
-  const completedDelta = summary.completedThisWeek - summary.completedPrevWeek;
-
   const filteredTasks = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const todayStart = startOfDay(new Date());
@@ -230,47 +170,7 @@ export default function TasksPanel() {
     });
   }, [tasks, searchQuery, statusFilter, dueFilter]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const stored = window.localStorage.getItem("taskViews");
-      if (!stored) return;
-      const parsed = JSON.parse(stored) as SavedView[];
-      if (Array.isArray(parsed)) {
-        setSavedViews(parsed);
-      }
-    } catch (err) {
-      setViewError(
-        (err as Error).message ?? "Failed to load saved task views",
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem("taskViews", JSON.stringify(savedViews));
-      setViewError(null);
-    } catch (err) {
-      setViewError(
-        (err as Error).message ?? "Failed to save task view changes",
-      );
-    }
-  }, [savedViews]);
-
-  const markPending = (taskId: string) => {
-    setPendingIds((prev) => new Set(prev).add(taskId));
-  };
-
-  const clearPending = (taskId: string) => {
-    setPendingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(taskId);
-      return next;
-    });
-  };
-
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -280,49 +180,81 @@ export default function TasksPanel() {
         return;
       }
       const data = (await response.json()) as { tasks?: Task[] };
-      setTasks(data.tasks ?? []);
+      const fetchedTasks = data.tasks ?? [];
+      setTasks(fetchedTasks);
+      
+      const overdueCount = fetchedTasks.filter(t => 
+        t.status === "uncompleted" && 
+        t.dueDate && 
+        new Date(t.dueDate) < startOfDay(new Date())
+      ).length;
+
+      if (overdueCount > 0) {
+        notify(`You have ${overdueCount} overdue task(s)!`, "warning");
+      }
     } catch (err) {
       setError((err as Error).message ?? "Failed to load tasks");
     } finally {
       setLoading(false);
     }
-  };
+  }, [notify]);
 
   useEffect(() => {
     void loadTasks();
+  }, [loadTasks]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem("taskViews");
+      if (!stored) return;
+      const parsed = JSON.parse(stored) as SavedView[];
+      if (Array.isArray(parsed)) setSavedViews(parsed);
+    } catch {
+      // Ignore
+    }
   }, []);
 
-  const handleChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem("taskViews", JSON.stringify(savedViews));
+    } catch {
+      // Ignore
+    }
+  }, [savedViews]);
+
+  const handleFormChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFilterChange = (
-    key: keyof ViewFilters,
-    value: ViewFilters[keyof ViewFilters],
-  ) => {
+  const handleEditChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    setEditForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleFilterChange = (key: "query" | "status" | "due", value: string | StatusFilter | DueFilter) => {
     setActiveViewId(null);
     if (key === "query") setSearchQuery(value as string);
     if (key === "status") setStatusFilter(value as StatusFilter);
     if (key === "due") setDueFilter(value as DueFilter);
   };
 
-  const applyTab = (tab: FilterTab) => {
+  const handleApplyTab = (tab: typeof FILTER_TABS[0]) => {
     setActiveViewId(null);
     setStatusFilter(tab.status);
     setDueFilter(tab.due);
   };
 
-  const applyView = (view: SavedView) => {
+  const handleApplyView = (view: SavedView) => {
     setActiveViewId(view.id);
     setSearchQuery(view.filters.query);
     setStatusFilter(view.filters.status);
     setDueFilter(view.filters.due);
   };
 
-  const saveView = () => {
+  const handleSaveView = () => {
     const trimmedName = viewName.trim();
     if (!trimmedName) {
       setViewError("Provide a name to save this view.");
@@ -343,11 +275,16 @@ export default function TasksPanel() {
     setActiveViewId(newView.id);
   };
 
-  const deleteView = (id: string) => {
+  const handleDeleteView = (id: string) => {
     setSavedViews((prev) => prev.filter((view) => view.id !== id));
-    if (activeViewId === id) {
-      setActiveViewId(null);
-    }
+    if (activeViewId === id) setActiveViewId(null);
+  };
+
+  const handleResetViews = () => {
+    setActiveViewId(null);
+    setSearchQuery("");
+    setStatusFilter("all");
+    setDueFilter("all");
   };
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
@@ -360,19 +297,14 @@ export default function TasksPanel() {
     setCreating(true);
     setError(null);
     try {
-      const payload: {
-        title: string;
-        description?: string;
-        dueDate?: string;
-      } = { title };
-      const description = form.description.trim();
-      if (description) payload.description = description;
-      if (form.dueDate) payload.dueDate = form.dueDate;
-
       const response = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          title,
+          description: form.description.trim() || undefined,
+          dueDate: form.dueDate || undefined,
+        }),
       });
       if (!response.ok) {
         setError(await readErrorMessage(response));
@@ -381,6 +313,7 @@ export default function TasksPanel() {
       const data = (await response.json()) as { task: Task };
       setTasks((prev) => [data.task, ...prev]);
       setForm(emptyForm);
+      notify("Task created successfully!", "success");
     } catch (err) {
       setError((err as Error).message ?? "Failed to create task");
     } finally {
@@ -388,11 +321,13 @@ export default function TasksPanel() {
     }
   };
 
-  const toggleStatus = async (task: Task) => {
-    const nextStatus =
-      task.status === "completed" ? "uncompleted" : "completed";
-    markPending(task._id);
-    setError(null);
+  const handleToggleStatus = async (task: Task) => {
+    const nextStatus = task.status === "completed" ? "uncompleted" : "completed";
+    const previousTasks = [...tasks];
+    setTasks((prev) =>
+      prev.map((t) => (t._id === task._id ? { ...t, status: nextStatus } : t)),
+    );
+
     try {
       const response = await fetch("/api/tasks", {
         method: "PATCH",
@@ -401,24 +336,24 @@ export default function TasksPanel() {
       });
       if (!response.ok) {
         setError(await readErrorMessage(response));
+        setTasks(previousTasks);
         return;
       }
       const data = (await response.json()) as { task: Task };
       setTasks((prev) =>
-        prev.map((current) =>
-          current._id === task._id ? data.task : current,
-        ),
+        prev.map((current) => (current._id === task._id ? data.task : current)),
       );
-    } catch (err) {
-      setError((err as Error).message ?? "Failed to update task");
-    } finally {
-      clearPending(task._id);
+      notify(`Task marked as ${nextStatus}!`, "success");
+    } catch {
+      setError("Failed to update task");
+      setTasks(previousTasks);
     }
   };
 
-  const deleteTask = async (taskId: string) => {
-    markPending(taskId);
-    setError(null);
+  const handleDeleteTask = async (taskId: string) => {
+    const previousTasks = [...tasks];
+    setTasks((prev) => prev.filter((task) => task._id !== taskId));
+
     try {
       const response = await fetch("/api/tasks", {
         method: "DELETE",
@@ -427,374 +362,179 @@ export default function TasksPanel() {
       });
       if (!response.ok) {
         setError(await readErrorMessage(response));
+        setTasks(previousTasks);
         return;
       }
-      setTasks((prev) => prev.filter((task) => task._id !== taskId));
-    } catch (err) {
-      setError((err as Error).message ?? "Failed to delete task");
-    } finally {
-      clearPending(taskId);
+      notify("Task deleted.", "info");
+    } catch {
+      setError("Failed to delete task");
+      setTasks(previousTasks);
+    }
+  };
+
+  const handleStartEdit = (task: Task) => {
+    setEditingTaskId(task._id);
+    setEditForm({
+      title: task.title,
+      description: task.description ?? "",
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : "",
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTaskId(null);
+    setEditForm(emptyForm);
+  };
+
+  const handleSaveEdit = async (taskId: string) => {
+    const title = editForm.title.trim();
+    if (!title) {
+      setError("Title is required.");
+      return;
+    }
+
+    const previousTasks = [...tasks];
+    const nextTask = {
+      ...tasks.find((t) => t._id === taskId)!,
+      title,
+      description: editForm.description.trim(),
+      dueDate: editForm.dueDate || null,
+    };
+    setTasks((prev) => prev.map((t) => (t._id === taskId ? nextTask : t)));
+    setEditingTaskId(null);
+
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: taskId,
+          title,
+          description: editForm.description.trim(),
+          dueDate: editForm.dueDate || null,
+        }),
+      });
+      if (!response.ok) {
+        setError(await readErrorMessage(response));
+        setTasks(previousTasks);
+        return;
+      }
+      const data = (await response.json()) as { task: Task };
+      setTasks((prev) =>
+        prev.map((current) => (current._id === taskId ? data.task : current)),
+      );
+      notify("Task updated.", "success");
+    } catch {
+      setError("Failed to update task");
+      setTasks(previousTasks);
     }
   };
 
   return (
-    <section className="mt-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-text-primary">Tasks</h2>
-          <p className="mt-1 text-sm text-text-secondary">
-            Create, track, and complete your work.
-          </p>
+          <h2 className="text-lg font-bold text-text-primary">Tasks</h2>
         </div>
-        <div className="flex items-center gap-3 text-sm text-text-muted">
-          <span>{loading ? "Loading tasks..." : `${tasks.length} task(s)`}</span>
+        <div className="flex items-center gap-3 text-xs text-text-muted">
+          <span>{loading ? "Loading..." : `${tasks.length} tasks`}</span>
           <button
             type="button"
             onClick={loadTasks}
             disabled={loading}
-            className="rounded-full border border-border-subtle px-3 py-1 text-xs font-medium uppercase tracking-wide text-text-secondary transition hover:border-indigo-500/30 hover:text-text-primary disabled:pointer-events-none disabled:opacity-40"
+            className="rounded-full border border-border-subtle px-3 py-1 font-medium uppercase tracking-wide text-text-secondary transition hover:border-indigo-500/30 hover:text-text-primary disabled:pointer-events-none disabled:opacity-40"
           >
             Refresh
           </button>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-lg shadow-black/20">
-          <p className="text-xs uppercase tracking-wide text-text-muted">
-            Due today
-          </p>
-          <p className="mt-3 text-2xl font-semibold text-text-primary">
-            {summary.dueToday}
-          </p>
-          <p
-            className={`mt-2 text-xs ${
-              dueTodayDelta > 0
-                ? "text-indigo-300"
-                : dueTodayDelta < 0
-                  ? "text-text-secondary"
-                  : "text-text-muted"
-            }`}
-          >
-            {formatDelta(dueTodayDelta, "vs yesterday")}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-lg shadow-black/20">
-          <p className="text-xs uppercase tracking-wide text-text-muted">
-            Completed this week
-          </p>
-          <p className="mt-3 text-2xl font-semibold text-text-primary">
-            {summary.completedThisWeek}
-          </p>
-          <p
-            className={`mt-2 text-xs ${
-              completedDelta > 0
-                ? "text-emerald-300"
-                : completedDelta < 0
-                  ? "text-amber-300"
-                  : "text-text-muted"
-            }`}
-          >
-            {formatDelta(completedDelta, "vs last week")}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-lg shadow-black/20">
-          <p className="text-xs uppercase tracking-wide text-text-muted">
-            Overdue
-          </p>
-          <p className="mt-3 text-2xl font-semibold text-text-primary">
-            {summary.overdue}
-          </p>
-          <p
-            className={`mt-2 text-xs ${
-              overdueDelta > 0
-                ? "text-red-300"
-                : overdueDelta < 0
-                  ? "text-emerald-300"
-                  : "text-text-muted"
-            }`}
-          >
-            {formatDelta(overdueDelta, "since yesterday")}
-          </p>
-        </div>
-      </div>
+      <TaskStats summary={summary} loading={loading} />
 
       {error && (
-        <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}
         </div>
       )}
-      {viewError && (
-        <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          {viewError}
-        </div>
-      )}
 
-      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,0.9fr),minmax(0,1.1fr)]">
-        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-text-primary">
-                New task
-              </p>
-              <p className="mt-1 text-xs text-text-muted">
-                Add clear, actionable items.
-              </p>
-            </div>
-            <span className="rounded-full border border-border-subtle bg-surface-overlay px-3 py-1 text-xs font-medium text-text-secondary">
-              {creating ? "Saving..." : "Draft"}
-            </span>
-          </div>
-          <form onSubmit={handleCreate} className="mt-5 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="sm:col-span-2">
-                <span className="text-xs uppercase tracking-wide text-text-muted">
-                  Title
-                </span>
-                <input
-                  name="title"
-                  value={form.title}
-                  onChange={handleChange}
-                  placeholder="Add a new task"
-                  className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
-                />
-              </label>
-              <label>
-                <span className="text-xs uppercase tracking-wide text-text-muted">
-                  Due date
-                </span>
-                <input
-                  type="date"
-                  name="dueDate"
-                  value={form.dueDate}
-                  onChange={handleChange}
-                  className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary"
-                />
-              </label>
-              <label className="sm:col-span-2">
-                <span className="text-xs uppercase tracking-wide text-text-muted">
-                  Notes
-                </span>
-                <textarea
-                  name="description"
-                  rows={3}
-                  value={form.description}
-                  onChange={handleChange}
-                  placeholder="Optional details"
-                  className="mt-2 w-full resize-none rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
-                />
-              </label>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs text-text-muted">
-                Keep titles short and specific.
-              </span>
-              <button
-                type="submit"
-                disabled={creating}
-                className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-white/6 disabled:pointer-events-none disabled:opacity-40"
-              >
-                {creating ? "Creating..." : "Add task"}
-              </button>
-            </div>
-          </form>
+      <div className="grid gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <TaskCreateForm
+            form={form}
+            creating={creating}
+            onChange={handleFormChange}
+            onSubmit={handleCreate}
+          />
         </div>
 
-        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
+        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20 lg:col-span-8">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-text-primary">
-                Task list
-              </p>
-              <p className="mt-1 text-xs text-text-muted">
-                Stay on top of what matters.
-              </p>
+              <p className="text-sm font-semibold text-text-primary">Task list</p>
+              <p className="mt-1 text-xs text-text-muted">Stay on top of what matters.</p>
             </div>
             <span className="rounded-full border border-border-subtle bg-surface-overlay px-3 py-1 text-xs font-medium text-text-secondary">
               {summary.completedTotal} done
             </span>
           </div>
 
-          <div className="mt-5">
-            <div className="space-y-3">
-              <label className="block">
-                <span className="text-xs uppercase tracking-wide text-text-muted">
-                  Search
-                </span>
-                <input
-                  value={searchQuery}
-                  onChange={(event) =>
-                    handleFilterChange("query", event.target.value)
-                  }
-                  placeholder="Search tasks..."
-                  className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
-                />
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                {FILTER_TABS.map((tab) => {
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => applyTab(tab)}
-                      aria-pressed={isActive}
-                      className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition ${
-                        isActive
-                          ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-200"
-                          : "border-border-subtle text-text-secondary hover:border-indigo-500/30 hover:text-text-primary"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-                {activeTabId === null && (
-                  <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-amber-200">
-                    Custom
-                  </span>
-                )}
-              </div>
-            </div>
+          <div className="mt-5 space-y-6">
+            <TaskFilters
+              searchQuery={searchQuery}
+              activeTabId={activeTabId}
+              onFilterChange={handleFilterChange}
+              onApplyTab={handleApplyTab}
+            />
 
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-text-muted">
-                Saved views
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveViewId(null);
-                  setSearchQuery("");
-                  setStatusFilter("all");
-                  setDueFilter("all");
-                }}
-                className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition ${
-                  activeViewId === null &&
-                  searchQuery === "" &&
-                  statusFilter === "all" &&
-                  dueFilter === "all"
-                    ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-200"
-                    : "border-border-subtle text-text-secondary hover:border-indigo-500/30 hover:text-text-primary"
-                }`}
-              >
-                Default
-              </button>
-              {savedViews.map((view) => (
-                <span
-                  key={view.id}
-                  className="flex items-center gap-1 rounded-full border border-border-subtle bg-surface-overlay px-2 py-1 text-xs text-text-secondary"
-                >
-                  <button
-                    type="button"
-                    onClick={() => applyView(view)}
-                    className={`px-2 py-1 text-xs font-medium ${
-                      activeViewId === view.id
-                        ? "text-indigo-200"
-                        : "text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    {view.name}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteView(view.id)}
-                    className="rounded-full px-1 text-xs text-text-muted hover:text-red-300"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <input
-                value={viewName}
-                onChange={(event) => setViewName(event.target.value)}
-                placeholder="Save this view as..."
-                className="w-full flex-1 rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
-              />
-              <button
-                type="button"
-                onClick={saveView}
-                className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-white/6"
-              >
-                Save view
-              </button>
-            </div>
+            <TaskViewManager
+              savedViews={savedViews}
+              activeViewId={activeViewId}
+              searchQuery={searchQuery}
+              statusFilter={statusFilter}
+              dueFilter={dueFilter}
+              viewName={viewName}
+              viewError={viewError}
+              onApplyView={handleApplyView}
+              onDeleteView={handleDeleteView}
+              onSaveView={handleSaveView}
+              onViewNameChange={setViewName}
+              onReset={handleResetViews}
+            />
 
             {loading ? (
-              <p className="text-sm text-text-secondary">Loading tasks…</p>
+              <div className="mt-6 space-y-3">
+                <TaskSkeleton />
+                <TaskSkeleton />
+                <TaskSkeleton />
+              </div>
             ) : filteredTasks.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border-subtle bg-surface-overlay px-4 py-6 text-sm text-text-muted">
-                No tasks match these filters.
+              <div className="mt-6 rounded-xl border border-dashed border-border-subtle bg-surface-overlay px-4 py-8 text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center text-text-muted">
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-.621-.504-1.125-1.125-1.125H9.75M8.25 21H15.75A2.25 2.25 0 0 0 18 18.75V5.25A2.25 2.25 0 0 0 15.75 3H8.25A2.25 2.25 0 0 0 6 5.25v13.5A2.25 2.25 0 0 0 8.25 21Z" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-text-primary">No tasks found</p>
+                <p className="mt-1 text-xs text-text-muted">Try adjusting your filters or search query.</p>
               </div>
             ) : (
-              <ul className="space-y-3">
-                {filteredTasks.map((task) => {
-                  const due = formatDate(task.dueDate);
-                  const isPending = pendingIds.has(task._id);
-                  const isComplete = task.status === "completed";
-                  return (
-                    <li
-                      key={task._id}
-                      className="rounded-xl border border-border-subtle bg-surface-overlay px-4 py-4 transition hover:border-indigo-500/30"
-                    >
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                                isComplete
-                                  ? "bg-emerald-500/10 text-emerald-300"
-                                  : "bg-indigo-500/10 text-indigo-300"
-                              }`}
-                            >
-                              {isComplete ? "Completed" : "In progress"}
-                            </span>
-                            {due && (
-                              <span className="text-xs text-text-muted">
-                                Due {due}
-                              </span>
-                            )}
-                          </div>
-                          <p
-                            className={`mt-2 text-sm font-semibold ${
-                              isComplete
-                                ? "text-text-muted line-through"
-                                : "text-text-primary"
-                            }`}
-                          >
-                            {task.title}
-                          </p>
-                          {task.description && (
-                            <p className="mt-1 text-sm text-text-secondary">
-                              {task.description}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => toggleStatus(task)}
-                            disabled={isPending}
-                            className="rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:border-emerald-500/30 hover:text-emerald-300 disabled:pointer-events-none disabled:opacity-40"
-                          >
-                            {isComplete ? "Mark uncompleted" : "Mark completed"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteTask(task._id)}
-                            disabled={isPending}
-                            className="rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:border-red-500/30 hover:text-red-300 disabled:pointer-events-none disabled:opacity-40"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
+              <ul className="mt-6 space-y-3">
+                {filteredTasks.map((task) => (
+                  <TaskListItem
+                    key={task._id}
+                    task={task}
+                    isEditing={editingTaskId === task._id}
+                    editForm={editForm}
+                    onStartEdit={handleStartEdit}
+                    onCancelEdit={handleCancelEdit}
+                    onEditChange={handleEditChange}
+                    onSaveEdit={handleSaveEdit}
+                    onToggleStatus={handleToggleStatus}
+                    onDelete={handleDeleteTask}
+                  />
+                ))}
               </ul>
             )}
           </div>
