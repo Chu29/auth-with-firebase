@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const session = req.cookies.get("session")?.value;
   const isProtectedRoute = req.nextUrl.pathname.startsWith("/dashboard");
   const isLoginPage = req.nextUrl.pathname === "/login";
