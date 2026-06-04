@@ -5,6 +5,7 @@ import SignOutButton from "@/components/signOutButton";
 import TasksPanel from "@/components/tasksPanel";
 import ActivityTimeline from "@/components/activityTimeline";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 
 async function getSession() {
   const sessionCookie = (await cookies()).get("session")?.value;
@@ -45,6 +46,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link
               href="/profile"
               className="flex items-center gap-2 rounded-full bg-surface-raised px-3 py-1.5 text-xs font-medium text-text-secondary border border-border-subtle transition hover:border-indigo-500/30 hover:text-text-primary"
