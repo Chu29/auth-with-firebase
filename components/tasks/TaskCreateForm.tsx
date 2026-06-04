@@ -71,7 +71,7 @@ export function TaskCreateForm({ form, creating, onChange, onSubmit }: TaskCreat
           <button
             type="submit"
             disabled={creating}
-            className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-white/6 disabled:pointer-events-none disabled:opacity-40"
+            className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-surface-overlay disabled:pointer-events-none disabled:opacity-40"
           >
             {creating ? "Creating..." : "Add task"}
           </button>

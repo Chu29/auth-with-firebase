@@ -87,7 +87,7 @@ export function TaskViewManager({
         <button
           type="button"
           onClick={onSaveView}
-          className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-white/6"
+          className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-surface-overlay"
         >
           Save view
         </button>
