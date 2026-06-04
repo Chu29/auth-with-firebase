@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 
 type TaskStatus = "completed" | "uncompleted";
 
@@ -10,6 +16,7 @@ type Task = {
   description?: string;
   status: TaskStatus;
   dueDate?: string | null;
+  updatedAt?: string | null;
 };
 
 type TaskFormState = {
@@ -43,6 +50,22 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString();
 }
 
+function toDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatDelta(delta: number, label: string) {
+  const sign = delta > 0 ? "+" : "";
+  return `${sign}${delta} ${label}`;
+}
+
 export default function TasksPanel() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +73,72 @@ export default function TasksPanel() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TaskFormState>(emptyForm);
+
+  const summary = useMemo(() => {
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - 6);
+    const prevWeekStart = new Date(weekStart);
+    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+
+    let dueToday = 0;
+    let dueYesterday = 0;
+    let overdue = 0;
+    let overduePrev = 0;
+    let completedThisWeek = 0;
+    let completedPrevWeek = 0;
+    let completedTotal = 0;
+
+    for (const task of tasks) {
+      if (task.status === "completed") {
+        completedTotal += 1;
+        const updatedAt = toDate(task.updatedAt);
+        if (updatedAt) {
+          if (updatedAt >= weekStart && updatedAt < tomorrowStart) {
+            completedThisWeek += 1;
+          } else if (updatedAt >= prevWeekStart && updatedAt < weekStart) {
+            completedPrevWeek += 1;
+          }
+        }
+        continue;
+      }
+
+      const due = toDate(task.dueDate);
+      if (!due) continue;
+
+      if (due >= todayStart && due < tomorrowStart) {
+        dueToday += 1;
+      }
+      if (due >= yesterdayStart && due < todayStart) {
+        dueYesterday += 1;
+      }
+      if (due < todayStart) {
+        overdue += 1;
+      }
+      if (due < yesterdayStart) {
+        overduePrev += 1;
+      }
+    }
+
+    return {
+      dueToday,
+      dueYesterday,
+      overdue,
+      overduePrev,
+      completedThisWeek,
+      completedPrevWeek,
+      completedTotal,
+    };
+  }, [tasks]);
+
+  const dueTodayDelta = summary.dueToday - summary.dueYesterday;
+  const overdueDelta = summary.overdue - summary.overduePrev;
+  const completedDelta = summary.completedThisWeek - summary.completedPrevWeek;
 
   const markPending = (taskId: string) => {
     setPendingIds((prev) => new Set(prev).add(taskId));
@@ -201,6 +290,66 @@ export default function TasksPanel() {
         </div>
       </div>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-lg shadow-black/20">
+          <p className="text-xs uppercase tracking-wide text-text-muted">
+            Due today
+          </p>
+          <p className="mt-3 text-2xl font-semibold text-text-primary">
+            {summary.dueToday}
+          </p>
+          <p
+            className={`mt-2 text-xs ${
+              dueTodayDelta > 0
+                ? "text-indigo-300"
+                : dueTodayDelta < 0
+                  ? "text-text-secondary"
+                  : "text-text-muted"
+            }`}
+          >
+            {formatDelta(dueTodayDelta, "vs yesterday")}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-lg shadow-black/20">
+          <p className="text-xs uppercase tracking-wide text-text-muted">
+            Completed this week
+          </p>
+          <p className="mt-3 text-2xl font-semibold text-text-primary">
+            {summary.completedThisWeek}
+          </p>
+          <p
+            className={`mt-2 text-xs ${
+              completedDelta > 0
+                ? "text-emerald-300"
+                : completedDelta < 0
+                  ? "text-amber-300"
+                  : "text-text-muted"
+            }`}
+          >
+            {formatDelta(completedDelta, "vs last week")}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-lg shadow-black/20">
+          <p className="text-xs uppercase tracking-wide text-text-muted">
+            Overdue
+          </p>
+          <p className="mt-3 text-2xl font-semibold text-text-primary">
+            {summary.overdue}
+          </p>
+          <p
+            className={`mt-2 text-xs ${
+              overdueDelta > 0
+                ? "text-red-300"
+                : overdueDelta < 0
+                  ? "text-emerald-300"
+                  : "text-text-muted"
+            }`}
+          >
+            {formatDelta(overdueDelta, "since yesterday")}
+          </p>
+        </div>
+      </div>
+
       {error && (
         <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}
@@ -288,7 +437,7 @@ export default function TasksPanel() {
               </p>
             </div>
             <span className="rounded-full border border-border-subtle bg-surface-overlay px-3 py-1 text-xs font-medium text-text-secondary">
-              {tasks.filter((task) => task.status === "completed").length} done
+              {summary.completedTotal} done
             </span>
           </div>
 
