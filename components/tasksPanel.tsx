@@ -181,134 +181,193 @@ export default function TasksPanel() {
 
   return (
     <section className="mt-10">
-      <div>
-        <h2 className="text-lg font-semibold text-text-primary">Tasks</h2>
-        <p className="mt-1 text-sm text-text-secondary">
-          Create, track, and complete your work.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">Tasks</h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            Create, track, and complete your work.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-sm text-text-muted">
+          <span>{loading ? "Loading tasks..." : `${tasks.length} task(s)`}</span>
+          <button
+            type="button"
+            onClick={loadTasks}
+            disabled={loading}
+            className="rounded-full border border-border-subtle px-3 py-1 text-xs font-medium uppercase tracking-wide text-text-secondary transition hover:border-indigo-500/30 hover:text-text-primary disabled:pointer-events-none disabled:opacity-40"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
-        <form onSubmit={handleCreate} className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="sm:col-span-2">
-              <span className="text-xs uppercase tracking-wide text-text-muted">
-                Title
-              </span>
-              <input
-                name="title"
-                value={form.title}
-                onChange={handleChange}
-                placeholder="Add a new task"
-                className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
-              />
-            </label>
-            <label>
-              <span className="text-xs uppercase tracking-wide text-text-muted">
-                Due date
-              </span>
-              <input
-                type="date"
-                name="dueDate"
-                value={form.dueDate}
-                onChange={handleChange}
-                className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary"
-              />
-            </label>
-            <label className="sm:col-span-2">
-              <span className="text-xs uppercase tracking-wide text-text-muted">
-                Notes
-              </span>
-              <textarea
-                name="description"
-                rows={3}
-                value={form.description}
-                onChange={handleChange}
-                placeholder="Optional details"
-                className="mt-2 w-full resize-none rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
-              />
-            </label>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {error ? (
-              <p className="text-sm text-red-400">{error}</p>
-            ) : (
-              <span className="text-sm text-text-muted">
-                {loading ? "Loading tasks..." : `${tasks.length} task(s)`}
-              </span>
-            )}
-            <button
-              type="submit"
-              disabled={creating}
-              className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-white/6 disabled:pointer-events-none disabled:opacity-40"
-            >
-              {creating ? "Creating..." : "Add task"}
-            </button>
-          </div>
-        </form>
+      {error && (
+        <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
 
-        <div className="mt-6">
-          {loading ? (
-            <p className="text-sm text-text-secondary">Loading tasks…</p>
-          ) : tasks.length === 0 ? (
-            <p className="text-sm text-text-muted">No tasks yet.</p>
-          ) : (
-            <ul className="space-y-3">
-              {tasks.map((task) => {
-                const due = formatDate(task.dueDate);
-                const isPending = pendingIds.has(task._id);
-                const isComplete = task.status === "completed";
-                return (
-                  <li
-                    key={task._id}
-                    className="rounded-xl border border-border-subtle bg-surface-overlay px-4 py-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p
-                          className={`text-sm font-semibold ${
-                            isComplete
-                              ? "text-text-muted line-through"
-                              : "text-text-primary"
-                          }`}
-                        >
-                          {task.title}
-                        </p>
-                        {task.description && (
-                          <p className="mt-1 text-sm text-text-secondary">
-                            {task.description}
+      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,0.9fr),minmax(0,1.1fr)]">
+        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-text-primary">
+                New task
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                Add clear, actionable items.
+              </p>
+            </div>
+            <span className="rounded-full border border-border-subtle bg-surface-overlay px-3 py-1 text-xs font-medium text-text-secondary">
+              {creating ? "Saving..." : "Draft"}
+            </span>
+          </div>
+          <form onSubmit={handleCreate} className="mt-5 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="sm:col-span-2">
+                <span className="text-xs uppercase tracking-wide text-text-muted">
+                  Title
+                </span>
+                <input
+                  name="title"
+                  value={form.title}
+                  onChange={handleChange}
+                  placeholder="Add a new task"
+                  className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
+                />
+              </label>
+              <label>
+                <span className="text-xs uppercase tracking-wide text-text-muted">
+                  Due date
+                </span>
+                <input
+                  type="date"
+                  name="dueDate"
+                  value={form.dueDate}
+                  onChange={handleChange}
+                  className="mt-2 w-full rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary"
+                />
+              </label>
+              <label className="sm:col-span-2">
+                <span className="text-xs uppercase tracking-wide text-text-muted">
+                  Notes
+                </span>
+                <textarea
+                  name="description"
+                  rows={3}
+                  value={form.description}
+                  onChange={handleChange}
+                  placeholder="Optional details"
+                  className="mt-2 w-full resize-none rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70"
+                />
+              </label>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-text-muted">
+                Keep titles short and specific.
+              </span>
+              <button
+                type="submit"
+                disabled={creating}
+                className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-indigo-500/30 hover:bg-white/6 disabled:pointer-events-none disabled:opacity-40"
+              >
+                {creating ? "Creating..." : "Add task"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-text-primary">
+                Task list
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                Stay on top of what matters.
+              </p>
+            </div>
+            <span className="rounded-full border border-border-subtle bg-surface-overlay px-3 py-1 text-xs font-medium text-text-secondary">
+              {tasks.filter((task) => task.status === "completed").length} done
+            </span>
+          </div>
+
+          <div className="mt-5">
+            {loading ? (
+              <p className="text-sm text-text-secondary">Loading tasks…</p>
+            ) : tasks.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border-subtle bg-surface-overlay px-4 py-6 text-sm text-text-muted">
+                No tasks yet. Add your first task to get started.
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {tasks.map((task) => {
+                  const due = formatDate(task.dueDate);
+                  const isPending = pendingIds.has(task._id);
+                  const isComplete = task.status === "completed";
+                  return (
+                    <li
+                      key={task._id}
+                      className="rounded-xl border border-border-subtle bg-surface-overlay px-4 py-4 transition hover:border-indigo-500/30"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                                isComplete
+                                  ? "bg-emerald-500/10 text-emerald-300"
+                                  : "bg-indigo-500/10 text-indigo-300"
+                              }`}
+                            >
+                              {isComplete ? "Completed" : "In progress"}
+                            </span>
+                            {due && (
+                              <span className="text-xs text-text-muted">
+                                Due {due}
+                              </span>
+                            )}
+                          </div>
+                          <p
+                            className={`mt-2 text-sm font-semibold ${
+                              isComplete
+                                ? "text-text-muted line-through"
+                                : "text-text-primary"
+                            }`}
+                          >
+                            {task.title}
                           </p>
-                        )}
-                        {due && (
-                          <p className="mt-2 text-xs text-text-muted">
-                            Due {due}
-                          </p>
-                        )}
+                          {task.description && (
+                            <p className="mt-1 text-sm text-text-secondary">
+                              {task.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleStatus(task)}
+                            disabled={isPending}
+                            className="rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:border-emerald-500/30 hover:text-emerald-300 disabled:pointer-events-none disabled:opacity-40"
+                          >
+                            {isComplete ? "Mark uncompleted" : "Mark completed"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteTask(task._id)}
+                            disabled={isPending}
+                            className="rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:border-red-500/30 hover:text-red-300 disabled:pointer-events-none disabled:opacity-40"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleStatus(task)}
-                          disabled={isPending}
-                          className="rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:border-emerald-500/30 hover:text-emerald-300 disabled:pointer-events-none disabled:opacity-40"
-                        >
-                          {isComplete ? "Mark uncompleted" : "Mark completed"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteTask(task._id)}
-                          disabled={isPending}
-                          className="rounded-lg border border-border-subtle bg-surface-overlay px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:border-red-500/30 hover:text-red-300 disabled:pointer-events-none disabled:opacity-40"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </section>

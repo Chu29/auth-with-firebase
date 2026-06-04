@@ -20,61 +20,109 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
 
   return (
-    <main className="min-h-screen px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <main className="relative min-h-screen overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-40 right-0 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-purple-500/10 blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto w-full max-w-5xl space-y-10">
+        <header className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-text-primary">
+            <p className="text-xs uppercase tracking-[0.3em] text-text-muted">
+              Welcome back
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-text-primary">
               Dashboard
             </h1>
-            <p className="mt-1 text-sm text-text-secondary">
-              Manage your account and settings
+            <p className="mt-2 text-sm text-text-secondary">
+              Signed in as{" "}
+              <span className="font-medium text-text-primary">
+                {session.email}
+              </span>
             </p>
           </div>
-          <SignOutButton />
-        </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-300">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Authenticated
+            </span>
+            <SignOutButton />
+          </div>
+        </header>
 
-        {/* Divider */}
-        <div className="mt-6 h-px bg-border-subtle" />
-
-        {/* Session card */}
-        <div className="mt-8 rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
-              <svg
-                className="h-5 w-5 text-emerald-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-                />
-              </svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-emerald-400">
-                Authenticated
-              </p>
-              <p className="mt-2 text-sm text-text-secondary">
-                Profile name{" "}
-                <span className="font-medium text-text-primary">
-                  {session.name}
-                </span>
-              </p>
-              <p className="mt-2 text-sm text-text-secondary">
-                Signed in as{" "}
-                <span className="font-medium text-text-primary">
-                  {session.email}
-                </span>
-              </p>
+        <section className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/10">
+                <svg
+                  className="h-6 w-6 text-indigo-300"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0"
+                  />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-text-primary">
+                  Profile
+                </p>
+                <p className="mt-2 text-sm text-text-secondary">
+                  Name{" "}
+                  <span className="font-medium text-text-primary">
+                    {session.name}
+                  </span>
+                </p>
+                <p className="mt-2 text-sm text-text-secondary">
+                  Email{" "}
+                  <span className="font-medium text-text-primary">
+                    {session.email}
+                  </span>
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+
+          <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6 shadow-lg shadow-black/20">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10">
+                <svg
+                  className="h-6 w-6 text-emerald-300"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 10.5h10.5a2.25 2.25 0 0 0 2.25-2.25v-6a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6A2.25 2.25 0 0 0 6.75 21Z"
+                  />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-text-primary">
+                  Session status
+                </p>
+                <p className="mt-2 text-sm text-text-secondary">
+                  Secure session cookie is active.
+                </p>
+                <p className="mt-2 text-sm text-text-secondary">
+                  User ID{" "}
+                  <span className="font-medium text-text-primary">
+                    {session.uid}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <TasksPanel />
       </div>

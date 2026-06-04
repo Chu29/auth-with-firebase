@@ -6,8 +6,9 @@ export default function SignOutButton() {
   return (
     <button
       onClick={signOut}
-      className="rounded-lg border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-medium text-text-secondary transition-all hover:border-red-500/30 hover:text-red-400"
+      className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-overlay px-4 py-2 text-sm font-semibold text-text-secondary transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200"
     >
+      <span className="h-2 w-2 rounded-full bg-red-400" />
       Sign Out
     </button>
   );
