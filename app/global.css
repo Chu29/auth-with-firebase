@@ -1,18 +1,46 @@
 @import "tailwindcss";
 
+:root {
+  --surface: #ffffff;
+  --surface-raised: #f9fafb;
+  --surface-overlay: rgba(0, 0, 0, 0.04);
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --danger: #dc2626;
+  --success: #16a34a;
+}
+
+.dark {
+  --surface: #0a0a0f;
+  --surface-raised: #13131a;
+  --surface-overlay: rgba(255, 255, 255, 0.04);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --text-primary: #f0f0f5;
+  --text-secondary: #8b8b9e;
+  --text-muted: #5a5a72;
+  --danger: #ef4444;
+  --success: #22c55e;
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-surface: #0a0a0f;
-  --color-surface-raised: #13131a;
-  --color-surface-overlay: rgba(255, 255, 255, 0.04);
-  --color-border-subtle: rgba(255, 255, 255, 0.08);
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-  --color-text-primary: #f0f0f5;
-  --color-text-secondary: #8b8b9e;
-  --color-text-muted: #5a5a72;
-  --color-danger: #ef4444;
-  --color-success: #22c55e;
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-border-subtle: var(--border-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
 }
 
 @layer base {
