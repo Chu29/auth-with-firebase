@@ -510,7 +510,7 @@ export default function TasksPanel() {
             ) : filteredTasks.length === 0 ? (
               <div className="mt-6 rounded-xl border border-dashed border-border-subtle bg-surface-overlay px-4 py-8 text-center">
                 <div className="flex justify-center mb-4">
-                  <div className="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center text-text-muted">
+                  <div className="h-12 w-12 rounded-full bg-surface-overlay flex items-center justify-center text-text-muted">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-.621-.504-1.125-1.125-1.125H9.75M8.25 21H15.75A2.25 2.25 0 0 0 18 18.75V5.25A2.25 2.25 0 0 0 15.75 3H8.25A2.25 2.25 0 0 0 6 5.25v13.5A2.25 2.25 0 0 0 8.25 21Z" />
                     </svg>
