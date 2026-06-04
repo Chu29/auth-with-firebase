@@ -5,6 +5,10 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   displayName: { type: String, required: true },
   photoURL: { type: String },
+  preferences: {
+    emailNotifications: { type: Boolean, default: false },
+    overdueReminders: { type: Boolean, default: true },
+  },
   createdAt: { type: Date, default: Date.now },
 });
 
