@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 
 type UserPreferences = {
   emailNotifications: boolean;
@@ -146,6 +147,7 @@ export default function ProfilePage() {
               Profile Settings
             </h1>
           </div>
+          <ThemeToggle />
         </header>
 
         <div className="grid gap-8">
@@ -227,7 +229,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => togglePreference("emailNotifications")}
-                    className={`h-6 w-11 rounded-full transition-colors relative ${preferences.emailNotifications ? "bg-indigo-600" : "bg-white/10"}`}
+                    className={`h-6 w-11 rounded-full transition-colors relative ${preferences.emailNotifications ? "bg-indigo-600" : "bg-surface-overlay"}`}
                   >
                     <div
                       className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-white transition-transform ${preferences.emailNotifications ? "translate-x-5" : ""}`}
@@ -246,7 +248,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => togglePreference("overdueReminders")}
-                    className={`h-6 w-11 rounded-full transition-colors relative ${preferences.overdueReminders ? "bg-indigo-600" : "bg-white/10"}`}
+                    className={`h-6 w-11 rounded-full transition-colors relative ${preferences.overdueReminders ? "bg-indigo-600" : "bg-surface-overlay"}`}
                   >
                     <div
                       className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-white transition-transform ${preferences.overdueReminders ? "translate-x-5" : ""}`}
@@ -276,7 +278,7 @@ export default function ProfilePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-xl bg-surface-overlay border border-border-subtle">
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-surface-overlay flex items-center justify-center">
                     <svg
                       className="h-4 w-4 text-text-primary"
                       viewBox="0 0 24 24"
@@ -312,7 +314,7 @@ export default function ProfilePage() {
 
               <div className="flex items-center justify-between p-4 rounded-xl bg-surface-overlay border border-border-subtle">
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-surface-overlay flex items-center justify-center">
                     <svg className="h-5 w-5" viewBox="0 0 24 24">
                       <path
                         fill="#4285F4"
